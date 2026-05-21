@@ -216,4 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-Adaptive_Model_Serving_and_Drift_Monitoring_Project.md
+.vscode
+
+# Ignore all request logs
+data/drift_logs/requests.csv

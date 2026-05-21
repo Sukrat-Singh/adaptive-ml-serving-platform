@@ -4,6 +4,8 @@ import joblib
 import pandas as pd
 from app.schemas import CustomerData
 import os
+import csv
+from datetime import datetime
 
 app = FastAPI(title="Churn Prediction API", version="1.0")
 
@@ -31,20 +33,35 @@ def health_check():
 
 @app.post("/predict")
 def predict_churn(customer: CustomerData):
-    """Predicts churn for a single customer[cite: 69, 76]."""
     if model_pipeline is None:
         raise HTTPException(status_code=503, detail="Model pipeline not loaded.")
     
-    # 1. Convert the incoming JSON payload back into a format pandas understands
-    # We use by_alias=True so it matches the exact column names your pipeline expects
     input_data = customer.dict(by_alias=True)
     df = pd.DataFrame([input_data])
     
-    # 2. Make prediction using the loaded pipeline
-    # The pipeline automatically handles the scaling and one-hot encoding! [cite: 75]
     try:
         prediction = model_pipeline.predict(df)[0]
         probability = model_pipeline.predict_proba(df)[0][1]
+        
+        # --- LOGGING LOGIC ---
+        log_dir = "data/drift_logs"
+        os.makedirs(log_dir, exist_ok=True)
+        file_path = os.path.join(log_dir, "requests.csv")
+        
+        file_exists = os.path.isfile(file_path)
+        with open(file_path, mode='a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(input_data.keys()) + ['timestamp', 'prediction', 'probability'])
+            if not file_exists:
+                writer.writeheader()
+            
+            log_entry = input_data.copy()
+            log_entry.update({
+                'timestamp': datetime.now().isoformat(),
+                'prediction': int(prediction),
+                'probability': float(probability)
+            })
+            writer.writerow(log_entry)
+        # --- END LOGGING ---
         
         return {
             "churn_prediction": int(prediction),
